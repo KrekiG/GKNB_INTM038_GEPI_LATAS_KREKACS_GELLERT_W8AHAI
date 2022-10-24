@@ -1,0 +1,40 @@
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+
+img = cv2.imread('puzzle31.png')
+sizes = (150,150)
+img = cv2.resize(img, sizes,interpolation = cv2.INTER_LINEAR)
+kernel = np.ones((5, 5), np.uint8)
+img_erosion = cv2.erode(img, kernel, iterations=3)
+img_dilation = cv2.dilate(img_erosion, kernel, iterations=5)
+gray = cv2.cvtColor(img_dilation,cv2.COLOR_BGR2GRAY)
+thresh = cv2.adaptiveThreshold(gray, 255, 0, 1, 3, 3)
+blur = cv2.GaussianBlur(thresh, (3,3),0)
+edges = cv2.Canny(blur,100,200)
+#contours, hierarchy = cv2.findContours(image=edges, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
+
+#maxi = 0
+#placeholder = 0
+
+#for i in range(len(contours)):
+    #if len(contours[i]) > maxi:
+        #maxi = len(contours[i])
+        #placeholder = i
+
+#contours2= cv2.drawContours(img, contours[placeholder], -1, (0,255,0), 3)
+
+
+
+corners = cv2.goodFeaturesToTrack(edges,25,0.01,10)
+corners = np.int0(corners)
+for i in corners:
+    x,y = i.ravel()
+    cv2.circle(img,(x,y),3,255,-1)
+print(corners)   
+
+cv2.imshow('img', img)
+cv2.imshow('edges',edges)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
