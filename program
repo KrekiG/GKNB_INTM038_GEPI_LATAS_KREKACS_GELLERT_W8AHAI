@@ -1,40 +1,94 @@
-import cv2
 import numpy as np
-from matplotlib import pyplot as plt
+import cv2
 
-img = cv2.imread('puzzle31.png')
-sizes = (150,150)
-img = cv2.resize(img, sizes,interpolation = cv2.INTER_LINEAR)
-kernel = np.ones((5, 5), np.uint8)
-img_erosion = cv2.erode(img, kernel, iterations=3)
-img_dilation = cv2.dilate(img_erosion, kernel, iterations=5)
-gray = cv2.cvtColor(img_dilation,cv2.COLOR_BGR2GRAY)
-thresh = cv2.adaptiveThreshold(gray, 255, 0, 1, 3, 3)
-blur = cv2.GaussianBlur(thresh, (3,3),0)
-edges = cv2.Canny(blur,100,200)
-#contours, hierarchy = cv2.findContours(image=edges, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
+img = cv2.imread('szines.png')
+copy_img = img.copy()
+final_img = np.zeros((img.shape[0],img.shape[1],img.shape[2]),np.uint8)
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+blur = cv2.GaussianBlur(gray, (5,5), 0)
+_, thresh = cv2.threshold(blur,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+edges = cv2.Canny(thresh,100,200)
+contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
 
-#maxi = 0
-#placeholder = 0
+x = []
+y = []
 
-#for i in range(len(contours)):
-    #if len(contours[i]) > maxi:
-        #maxi = len(contours[i])
-        #placeholder = i
+for i in range(len(contours)):
+    x.append([])
+    y.append([])
+    for j in range(len(contours[i])):
+        x[i].append(contours[i][j][0][0])
+        y[i].append(contours[i][j][0][1])
 
-#contours2= cv2.drawContours(img, contours[placeholder], -1, (0,255,0), 3)
+corners = cv2.cornerHarris(edges,2,3,0.04)
+corners = cv2.dilate(corners,None)
+img[corners>0.01*corners.max()]=[0,0,255]
+
+pieces = []
+pieces_gray = []
+for i in range(len(contours)):
+    crop = copy_img[min(y[i]):max(y[i]), min(x[i]):max(x[i])]
+    gray_piece = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    pieces.append(crop)
+    pieces_gray.append(gray_piece)
+
+for i in range(len(pieces)-1):
+    if i == 0:
+        sift = cv2.SIFT_create()
+        firstKeypoints, firstDescriptors = sift.detectAndCompute(pieces_gray[i],None)
+        secondKeypoints, secondDescriptors = sift.detectAndCompute(pieces_gray[i+1],None)
+        matcher = cv2.BFMatcher(cv2.NORM_L1, crossCheck=True)
+        matches = matcher.match(firstDescriptors,secondDescriptors)
+        matches = sorted(matches, key = lambda x:x.distance)
+        final_img = cv2.drawMatches(pieces[i], firstKeypoints, pieces[i+1], secondKeypoints, matches[:20],None)
+        cv2.imshow('final_img[{}]'.format(i),final_img)
+    else:
+        sift = cv2.SIFT_create()
+        firstKeypoints, firstDescriptors = sift.detectAndCompute(final_img,None)
+        secondKeypoints, secondDescriptors = sift.detectAndCompute(pieces_gray[i+1],None)
+        matcher = cv2.BFMatcher(cv2.NORM_L1, crossCheck=True)
+        matches = matcher.match(firstDescriptors,secondDescriptors)
+        matches = sorted(matches, key = lambda x:x.distance)
+        final_img = cv2.drawMatches(final_img, firstKeypoints, pieces[i+1], secondKeypoints, matches[:20],None)
+        cv2.imshow('final_img[{}]'.format(i),final_img)
+
+if pieces[0].shape[1] >= pieces[1].shape[1]:
+    wid = pieces[1].shape[1]
+else:
+    wid = pieces[0].shape[1]
+if pieces[0].shape[2] >= pieces[1].shape[2]:
+    hei = pieces[1].shape[2]
+else:
+    hei = pieces[0].shape[2]
+#felső oldal    
+counter = 0
+for i in range(wid):
+    if (pieces[0][0][i] == pieces[1][hei][i]).any():
+        counter += 1
+print(counter)
+#jobb oldal    
+counter = 0
+for i in range(hei):
+    if (pieces[0][i][hei] == pieces[1][i][0]).any():
+        counter += 1
+print(counter)
+#bal oldal
+counter = 0
+for i in range(hei):
+    if (pieces[0][i][hei] == pieces[1][i][0]).any():
+        counter += 1
+print(counter)
+#alsó oldal
+counter = 0
+for i in range(wid):
+    if (pieces[0][hei][i] == pieces[0][0][i]).any():
+        counter += 1
+print(counter)
 
 
 
-corners = cv2.goodFeaturesToTrack(edges,25,0.01,10)
-corners = np.int0(corners)
-for i in corners:
-    x,y = i.ravel()
-    cv2.circle(img,(x,y),3,255,-1)
-print(corners)   
 
-cv2.imshow('img', img)
-cv2.imshow('edges',edges)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
+cv2.imshow('img',img)
+cv2.waitKey(0) 
+cv2.destroyAllWindows() 
